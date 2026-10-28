@@ -1,0 +1,101 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: task-tracker-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tasktracker}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tasktracker}
+      POSTGRES_DB: ${POSTGRES_DB:-tasktracker}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tasktracker} -d ${POSTGRES_DB:-tasktracker}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  migrate:
+    image: task-tracker-api
+    build:
+      context: .
+      target: runtime
+    container_name: task-tracker-migrate
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-tasktracker}:${POSTGRES_PASSWORD:-tasktracker}@db:5432/${POSTGRES_DB:-tasktracker}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-only-secret-key-change-in-production-32}
+      ENVIRONMENT: ${ENVIRONMENT:-local}
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: ["/app/docker/migrate.sh"]
+    restart: "no"
+
+  api:
+    image: task-tracker-api
+    build:
+      context: .
+      target: runtime
+    container_name: task-tracker-api
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-tasktracker}:${POSTGRES_PASSWORD:-tasktracker}@db:5432/${POSTGRES_DB:-tasktracker}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-only-secret-key-change-in-production-32}
+      ENVIRONMENT: ${ENVIRONMENT:-local}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      DB_ECHO: ${DB_ECHO:-false}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@example.com}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-Adminpass1}
+      BOOTSTRAP_ADMIN_FULL_NAME: ${BOOTSTRAP_ADMIN_FULL_NAME:-Administrator}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  tests:
+    build:
+      context: .
+      target: test
+    container_name: task-tracker-tests
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-tasktracker}:${POSTGRES_PASSWORD:-tasktracker}@db:5432/${POSTGRES_DB:-tasktracker}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-only-secret-key-change-in-production-32}
+      ENVIRONMENT: test
+      LOG_LEVEL: WARNING
+      BOOTSTRAP_ADMIN_EMAIL: ""
+      BOOTSTRAP_ADMIN_PASSWORD: ""
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      - ./src:/app/src
+      - ./tests:/app/tests
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini
+      - ./pyproject.toml:/app/pyproject.toml
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
