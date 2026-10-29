@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     app_version: str = '0.1.0'
     environment: Literal['local', 'test', 'production'] = 'local'
     debug: bool = False
-    api_v1_prefix: str = '/api/v1'
+    api_prefix: str = '/api/v1.0'
     log_level: str = 'INFO'
 
     database_url: str

@@ -14,10 +14,14 @@ RUN useradd --create-home --shell /usr/sbin/nologin appuser
 WORKDIR /app
 
 
-FROM base AS builder
+FROM base AS poetry
 
 RUN pip install --no-cache-dir "poetry==${POETRY_VERSION}"
 COPY pyproject.toml poetry.lock ./
+
+
+FROM poetry AS builder
+
 RUN poetry install --no-root --only main
 
 
@@ -35,6 +39,7 @@ COPY src ./src
 COPY alembic ./alembic
 COPY alembic.ini ./alembic.ini
 COPY docker ./docker
+COPY pyproject.toml ./pyproject.toml
 
 USER appuser
 EXPOSE 8000
@@ -58,4 +63,24 @@ COPY pyproject.toml ./pyproject.toml
 
 USER appuser
 ENTRYPOINT ["/app/docker/entrypoint.sh"]
+CMD ["sleep", "infinity"]
+
+
+FROM poetry AS e2e-builder
+
+RUN poetry install --no-root --only e2e
+
+
+FROM base AS e2e
+
+ENV PYTEST_CACHE_DIR=/tmp/pytest-cache \
+    HOME=/tmp \
+    PYTHONPATH="/app"
+
+COPY --from=e2e-builder /app/.venv /app/.venv
+COPY tests/__init__.py ./tests/__init__.py
+COPY tests/e2e ./tests/e2e
+COPY tests/e2e/pyproject.toml ./pyproject.toml
+
+USER appuser
 CMD ["sleep", "infinity"]

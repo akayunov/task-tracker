@@ -18,6 +18,7 @@ pyjwt = "^2.10"
 pwdlib = { extras = ["argon2"], version = "^0.2" }
 email-validator = "^2.2"
 python-multipart = "^0.0.18"
+coverage = { extras = ["toml"], version = "^7.6" }
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3"
@@ -25,6 +26,10 @@ pytest-asyncio = "^0.25"
 httpx = "^0.28"
 ruff = "^0.8"
 mypy = "^1.14"
+
+[tool.poetry.group.e2e.dependencies]
+pytest = "^8.3"
+httpx = "^0.28"
 
 [build-system]
 requires = ["poetry-core>=2.0.0"]
@@ -35,6 +40,9 @@ testpaths = ["tests"]
 pythonpath = ["src", "."]
 asyncio_mode = "auto"
 cache_dir = "/tmp/pytest-cache"
+markers = [
+    "e2e: HTTP checks against a running API (E2E_BASE_URL)",
+]
 
 [tool.ruff]
 line-length = 100
@@ -74,3 +82,20 @@ plugins = ["pydantic.mypy"]
 init_forbid_extra = true
 init_typed = true
 warn_required_dynamic_aliases = true
+
+[tool.coverage.run]
+branch = true
+parallel = true
+source = ["tasktracker"]
+omit = ["*/tests/*", "*/alembic/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"

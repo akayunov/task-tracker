@@ -27,7 +27,7 @@ async def create_task(
 ) -> TaskRead:
     """Создать задачу. Исполнитель необязателен."""
     task = await TaskService(session).create(actor, payload)
-    prefix = get_settings().api_v1_prefix
+    prefix = get_settings().api_prefix
     # код возврата 201, так что переход по ссылке на усмотрение клиента
     response.headers['Location'] = f'{prefix}/tasks/{task.id}'
     return task

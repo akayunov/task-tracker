@@ -41,6 +41,14 @@ class UserRepository:
         result = await self._session.execute(statement)
         return result.scalar_one_or_none()
 
+    async def deactivate(self, user: User) -> None:
+        """Выключить пользователя (is_active=false), не удаляя строку.
+
+        :param user: загруженная строка
+        """
+        user.is_active = False
+        await self._session.flush()
+
     async def list_active(
         self,
         search: str | None,

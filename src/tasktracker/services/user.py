@@ -2,7 +2,9 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tasktracker.core.exceptions import NotFoundError
+from tasktracker.core.exceptions import ForbiddenError, NotFoundError
+from tasktracker.db.models import User
+from tasktracker.domain.policies import UserPolicy
 from tasktracker.repositories.user import UserRepository
 from tasktracker.schemas.common import Page, paginate
 from tasktracker.schemas.user import UserListParams, UserRead
@@ -41,3 +43,24 @@ class UserService:
         )
         profiles = [UserRead.model_validate(item) for item in items]
         return paginate(profiles, total, params.page, params.page_size)
+
+    async def delete(self, actor: User, user_id: UUID) -> None:
+        """Деактивировать пользователя (себя или любого — для админа).
+
+        Строка в БД остаётся, ``is_active`` становится false: логин и access
+        перестают работать, профиль по id по-прежнему читается.
+
+        :param actor: кто выключает
+        :param user_id: кого выключить
+        :raises NotFoundError: пользователь не найден
+        :raises ForbiddenError: нет права
+        """
+        if not UserPolicy.can_delete(actor, user_id):
+            raise ForbiddenError(
+                'Only the account owner or an administrator can delete this user',
+                code='user_delete_forbidden',
+            )
+        user = await self._users.get(user_id)
+        if user is None:
+            raise NotFoundError('User not found', code='user_not_found')
+        await self._users.deactivate(user)

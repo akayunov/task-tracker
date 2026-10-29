@@ -2,7 +2,10 @@ from fastapi import status
 from httpx import AsyncClient
 from sqlalchemy import text
 
+from tasktracker.core.config import get_settings
 from tasktracker.db.session import get_engine
+
+API_PREFIX = get_settings().api_prefix
 
 
 async def register_user(
@@ -12,7 +15,7 @@ async def register_user(
     full_name: str = 'Test User',
 ) -> dict:
     response = await client.post(
-        '/api/v1/auth/register',
+        f'{API_PREFIX}/auth/register',
         json={'email': email, 'password': password, 'full_name': full_name},
     )
     assert response.status_code == status.HTTP_201_CREATED, response.text
@@ -25,7 +28,7 @@ async def login_user(
     password: str = 'Password1',
 ) -> dict:
     response = await client.post(
-        '/api/v1/auth/login',
+        f'{API_PREFIX}/auth/login',
         json={'email': email, 'password': password},
     )
     assert response.status_code == status.HTTP_200_OK, response.text
@@ -60,6 +63,6 @@ async def create_task(client: AsyncClient, headers: dict[str, str], **overrides)
         'priority': 'medium',
     }
     payload.update(overrides)
-    response = await client.post('/api/v1/tasks', json=payload, headers=headers)
+    response = await client.post(f'{API_PREFIX}/tasks', json=payload, headers=headers)
     assert response.status_code == status.HTTP_201_CREATED, response.text
     return response.json()

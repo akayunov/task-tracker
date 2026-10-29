@@ -1,0 +1,8 @@
+# Минимальный конфиг pytest для образа e2e (без кода приложения).
+[tool.pytest.ini_options]
+testpaths = ["tests/e2e"]
+pythonpath = ["."]
+cache_dir = "/tmp/pytest-cache"
+markers = [
+    "e2e: HTTP checks against a running API (E2E_BASE_URL)",
+]

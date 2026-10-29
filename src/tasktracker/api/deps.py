@@ -13,7 +13,7 @@ from tasktracker.repositories.user import UserRepository
 
 _settings = get_settings()
 oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl=f'{_settings.api_v1_prefix}/auth/token',
+    tokenUrl=f'{_settings.api_prefix}/auth/token',
     auto_error=False,
 )
 

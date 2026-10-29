@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 os.environ['ENVIRONMENT'] = 'test'
 os.environ['BOOTSTRAP_ADMIN_EMAIL'] = ''
@@ -23,7 +23,7 @@ os.environ.setdefault(
 
 def pytest_sessionstart(session: pytest.Session) -> None:
     """Накатить миграции на базу из DATABASE_URL."""
-    del session
+    del session  # обязательный аргумент хука pytest
     result = subprocess.run(
         [sys.executable, '-m', 'alembic', 'upgrade', 'head'],
         cwd=ROOT,

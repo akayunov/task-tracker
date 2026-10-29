@@ -40,3 +40,9 @@ class CommentPolicy:
     @staticmethod
     def can_modify(actor: Actor, comment: CommentAccess) -> bool:
         return actor.role == UserRole.ADMIN or comment.author_id == actor.id
+
+
+class UserPolicy:
+    @staticmethod
+    def can_delete(actor: Actor, target_id: UUID) -> bool:
+        return actor.role == UserRole.ADMIN or actor.id == target_id

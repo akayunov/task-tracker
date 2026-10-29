@@ -1,7 +1,6 @@
 services:
   db:
     image: postgres:16-alpine
-    container_name: task-tracker-db
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-tasktracker}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tasktracker}
@@ -10,6 +9,8 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tasktracker} -d ${POSTGRES_DB:-tasktracker}"]
       interval: 5s
@@ -22,7 +23,6 @@ services:
     build:
       context: .
       target: runtime
-    container_name: task-tracker-migrate
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-tasktracker}:${POSTGRES_PASSWORD:-tasktracker}@db:5432/${POSTGRES_DB:-tasktracker}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-only-secret-key-change-in-production-32}
@@ -30,6 +30,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    networks:
+      - data
     entrypoint: ["/app/docker/migrate.sh"]
     restart: "no"
 
@@ -38,7 +40,6 @@ services:
     build:
       context: .
       target: runtime
-    container_name: task-tracker-api
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-tasktracker}:${POSTGRES_PASSWORD:-tasktracker}@db:5432/${POSTGRES_DB:-tasktracker}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-only-secret-key-change-in-production-32}
@@ -58,6 +59,9 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+    networks:
+      - data
+      - edge
     healthcheck:
       test:
         [
@@ -72,11 +76,11 @@ services:
       start_period: 20s
     restart: unless-stopped
 
-  tests:
+  tests-unit:
+    image: task-tracker-tests-unit
     build:
       context: .
       target: test
-    container_name: task-tracker-tests
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-tasktracker}:${POSTGRES_PASSWORD:-tasktracker}@db:5432/${POSTGRES_DB:-tasktracker}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-only-secret-key-change-in-production-32}
@@ -89,6 +93,8 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+    networks:
+      - data
     volumes:
       - ./src:/app/src
       - ./tests:/app/tests
@@ -96,6 +102,30 @@ services:
       - ./alembic.ini:/app/alembic.ini
       - ./pyproject.toml:/app/pyproject.toml
     restart: unless-stopped
+
+  tests-e2e:
+    image: task-tracker-tests-e2e
+    build:
+      context: .
+      target: e2e
+    environment:
+      E2E_BASE_URL: ${E2E_BASE_URL:-http://api:8000}
+      E2E_API_PREFIX: ${E2E_API_PREFIX:-/api/v1.0}
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - edge
+    volumes:
+      # Для локальной разработки: править тесты без пересборки образа.
+      # В CI/проде том можно не монтировать — тесты уже в образе.
+      - ./tests/e2e:/app/tests/e2e
+    restart: unless-stopped
+
+networks:
+  data:
+    internal: true
+  edge:
 
 volumes:
   postgres_data:

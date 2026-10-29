@@ -1,7 +1,7 @@
 from uuid import uuid4
 
 from tasktracker.domain.enums import UserRole
-from tasktracker.domain.policies import CommentPolicy, TaskPolicy
+from tasktracker.domain.policies import CommentPolicy, TaskPolicy, UserPolicy
 
 
 class _Actor:
@@ -43,3 +43,6 @@ def test_admin_policy_bypass():
     assert TaskPolicy.can_delete(admin, task)
     assert CommentPolicy.can_modify(admin, comment)
     assert not CommentPolicy.can_modify(_Actor(UserRole.USER), comment)
+    assert UserPolicy.can_delete(admin, author.id)
+    assert UserPolicy.can_delete(author, author.id)
+    assert not UserPolicy.can_delete(author, admin.id)

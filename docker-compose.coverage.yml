@@ -1,0 +1,76 @@
+# Overlay for coverage collection.
+# Prefer: make coverage  |  CI: ./docker/ci_coverage.sh
+#
+# ENABLE_COVERAGE wraps long-lived Python apps (uvicorn, …) with `coverage run`.
+# Data is flushed on SIGTERM. parallel-mode keeps per-process files unique, so
+# tomorrow's extra services can share the same volume safely.
+# Reports land in the coverage_data volume; extract_coverage.sh copies them out.
+
+x-coverage-env: &coverage-env
+  ENABLE_COVERAGE: 'true'
+  COVERAGE_DIR: /app/coverage_dir
+  COVERAGE_FILE: /app/coverage_dir/.coverage
+
+x-coverage-volume: &coverage-volume
+  type: volume
+  source: coverage_data
+  target: /app/coverage_dir
+
+services:
+  coverage-init:
+    image: busybox:1.36
+    volumes:
+      - coverage_data:/data
+    command:
+      [
+        'sh',
+        '-c',
+        'rm -f /data/.coverage* && chmod 777 /data',
+      ]
+    restart: 'no'
+
+  api:
+    environment:
+      <<: *coverage-env
+    volumes:
+      - *coverage-volume
+    labels:
+      tasktracker.coverage: 'true'
+    depends_on:
+      coverage-init:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  tests-unit:
+    environment:
+      <<: *coverage-env
+    volumes:
+      - *coverage-volume
+    depends_on:
+      coverage-init:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  coverage-report:
+    image: task-tracker-tests-unit
+    build:
+      context: .
+      target: test
+    environment:
+      <<: *coverage-env
+      COVERAGE_HTML_DIR: /app/coverage_dir/htmlcov
+      COVERAGE_XML_PATH: /app/coverage_dir/coverage.xml
+    volumes:
+      - *coverage-volume
+    entrypoint: ['/app/docker/aggregate_coverage.sh']
+    profiles: ['coverage-report']
+    restart: 'no'
+
+volumes:
+  coverage_data:
